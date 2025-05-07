@@ -3,9 +3,11 @@ package handler
 import (
 	"catalog-restaurant/internal/database"
 	"catalog-restaurant/internal/model"
+	"catalog-restaurant/internal/pagination"
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 func GetDishsOfMenu(w http.ResponseWriter, r *http.Request) {
@@ -47,8 +49,15 @@ func GetDishsOfMenu(w http.ResponseWriter, r *http.Request) {
 		ch <- categoryMapSlice
 		close(ch)
 	}()
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 
-	rows, err := dbpool.Query(context.Background(), `SELECT * FROM get_info_dish()`)
+	limit, offset, total, err := pagination.Paginate(limit, offset, "menu")
+	if err != nil {
+		json.NewEncoder(w).Encode(model.ErrorMessage{ErrorMessage: err.Error(), Error: err.Error()})
+	}
+
+	rows, err := dbpool.Query(context.Background(), `SELECT * FROM get_paginated_data_menu($1,$2)`, limit, offset)
 	if err != nil {
 		json.NewEncoder(w).Encode(model.ErrorMessage{ErrorMessage: err.Error(), Error: err.Error()})
 	}
@@ -74,7 +83,9 @@ func GetDishsOfMenu(w http.ResponseWriter, r *http.Request) {
 				typeCuisine})
 
 	}
-	json.NewEncoder(w).Encode(dishs)
+	paginat := model.PaginationMenu{limit, offset, total}
+
+	json.NewEncoder(w).Encode(model.PaginationMenuResponse{Info_Dishs: dishs, Pagination: paginat})
 
 }
 
