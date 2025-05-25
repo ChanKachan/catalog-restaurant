@@ -2,14 +2,42 @@ package main
 
 import (
 	"catalog-restaurant/internal/handler"
+	logger2 "catalog-restaurant/internal/logger"
+	myCors "catalog-restaurant/internal/myCore"
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"log"
 	"net/http"
+	"os"
 )
 
+var jwtKey = []byte(os.Getenv("JWT_KEY"))
+
 func main() {
+	logger := logger2.InitLogger()
+	logger.Info("Запуск сервера")
 	r := mux.NewRouter()
-	r.HandleFunc("/menu", handler.GetDishsOfMenu).Methods("GET")
+
+	ports, err := myCors.CreateArrOfPorts("3000", "8000")
+	if err != nil {
+		logger.Error("Ошибка создание портов для cors")
+		return
+	}
+
+	c := cors.New(cors.Options{
+		AllowedOrigins:   ports,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		Debug:            true,
+	})
+
+	r.HandleFunc("/api/menu", handler.GetDishsOfMenu).Methods("GET")
 	//r.HandleFunc("/menu/dish/{id}", handler.GetDish).Methods("GET")
-	log.Fatal(http.ListenAndServe(":8080", r))
+
+	// Обертываем роутер в CORS middleware
+	handler := c.Handler(r)
+
+	log.Fatal(http.ListenAndServe(":8001", handler))
+	logger.Info("Сервер запущен")
 }
